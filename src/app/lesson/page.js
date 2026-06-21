@@ -6,6 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://fret-buddy-api.onre
 
 export default function LessonPage() {
   const videoRef = useRef(null)
+  const pipRef = useRef(null)
   const canvasRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
@@ -81,6 +82,11 @@ export default function LessonPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
+      }
+      // Mirror stream to PiP preview in chat panel
+      if (pipRef.current) {
+        pipRef.current.srcObject = stream
+        pipRef.current.play()
       }
       setCameraActive(true)
       cameraActiveRef.current = true
@@ -468,6 +474,29 @@ export default function LessonPage() {
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Live camera preview pip */}
+        {cameraActive && (
+          <div className="px-4 pt-3">
+            <div className="relative rounded-xl overflow-hidden bg-black border border-white/10" style={{ aspectRatio: '16/9' }}>
+              <video
+                ref={pipRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                {lessonMode ? '🔴 Live' : '📷 Preview'}
+              </div>
+              {lessonMode && (
+                <div className="absolute bottom-2 right-2 bg-orange-500/80 text-white text-xs px-2 py-0.5 rounded-full">
+                  analyzing every 10s
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="p-4 border-t border-white/10 space-y-3">
