@@ -26,7 +26,7 @@ export default function LessonPage() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
@@ -76,7 +76,7 @@ export default function LessonPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'AI error')
 
-      const aiText = data.response || data.message || 'Great work! Keep it up.'
+      const aiText = data.response_text || data.response || data.message || '(no response)'
       setMessages(prev => [...prev, { role: 'ai', text: aiText }])
       setCurrentTopic(data.topic || currentTopic)
 
@@ -175,7 +175,7 @@ export default function LessonPage() {
         body: fd,
       })
       const data = await res.json()
-      const text = data.text || data.transcript || ''
+      const text = data.transcript || data.text || ''
       if (text.trim()) {
         setMessages(prev => [...prev, { role: 'user', text }])
         const frame = cameraActive ? captureFrame() : null
