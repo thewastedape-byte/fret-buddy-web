@@ -93,6 +93,30 @@ export default function LessonPage() {
     }
   }
 
+  const flipCamera = async () => {
+    const newMode = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(newMode)
+    if (cameraActiveRef.current) {
+      // Stop current stream
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+        videoRef.current.srcObject = null
+      }
+      // Restart with new facing mode
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: newMode } },
+          audio: false
+        })
+        streamRef.current = stream
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
+        if (pipRef.current) { pipRef.current.srcObject = stream; pipRef.current.play().catch(() => {}) }
+      } catch (err) {
+        setError(`Camera flip failed: ${err.message}`)
+      }
+    }
+  }
+
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(t => t.stop())
@@ -494,6 +518,12 @@ export default function LessonPage() {
               <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
                 {lessonMode ? '🔴 Live' : '📷 Preview'}
               </div>
+              <button
+                onClick={flipCamera}
+                className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full"
+              >
+                🔄 {facingMode === 'environment' ? 'Selfie' : 'Back'}
+              </button>
               {lessonMode && (
                 <div className="absolute bottom-2 right-2 bg-orange-500/80 text-white text-xs px-2 py-0.5 rounded-full">
                   analyzing every 10s
