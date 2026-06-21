@@ -26,6 +26,9 @@ export default function LessonPage() {
   const [currentTopic, setCurrentTopic] = useState('Getting Started')
   const [error, setError] = useState('')
   const [textInput, setTextInput] = useState('')
+  const [guitarRecording, setGuitarRecording] = useState(false)
+  const guitarRecorderRef = useRef(null)
+  const guitarChunksRef = useRef([])
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('fretbuddy_token') : null
 
@@ -146,7 +149,91 @@ export default function LessonPage() {
     }
   }
 
-  // Voice recording — tap to start, tap again to stop & send
+  // Guitar audio analysis — record playing and send to GPT-4o Audio
+  const toggleGuitarRecord = async () => {
+    if (guitarRecording) {
+      if (guitarRecorderRef.current?.state === 'recording') {
+        guitarRecorderRef.current.stop()
+      }
+      setGuitarRecording(false)
+      return
+    }
+    if (loadingRef.current) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      guitarChunksRef.current = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const mr = new MediaRecorder(stream, { mimeType })
+      mr.ondataavailable = e => { if (e.data?.size > 0) guitarChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        if (guitarChunksRef.current.length === 0) { setError('No audio captured'); return }
+        const blob = new Blob(guitarChunksRef.current, { type: mimeType })
+        // Convert to base64 and send for guitar analysis
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+          const base64 = reader.result.split(',')[1]
+          const format = mimeType.includes('mp4') ? 'mp4' : 'webm'
+          setMessages(prev => [...prev, { role: 'user', text: '🎸 [played guitar — analyzing...]' }])
+          await sendGuitarAudio(base64, format)
+        }
+        reader.readAsDataURL(blob)
+      }
+      mr.start(250)
+      guitarRecorderRef.current = mr
+      setGuitarRecording(true)
+      setError('')
+    } catch (err) {
+      setError(`Mic error: ${err.message}`)
+    }
+  }
+
+  const sendGuitarAudio = async (base64, format) => {
+    if (loadingRef.current) return
+    setLoadingSync(true)
+    try {
+      const token = getToken()
+      const body = {
+        analyze_audio: true,
+        audio_base64: base64,
+        audio_format: format,
+        message: 'Listen to my guitar playing and give me specific feedback. What notes or chords do you hear? Is my timing good? Any tuning issues?',
+      }
+      const res = await fetch(`${API_BASE}/api/teach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      const aiText = data.response_text || data.response || '(no response)'
+      setMessages(prev => [
+        ...prev.filter(m => m.text !== '🎸 [played guitar — analyzing...]'),
+        { role: 'user', text: '🎸 [guitar audio]' },
+        { role: 'ai', text: aiText },
+      ])
+      // Speak the response
+      try {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel()
+          const u = new SpeechSynthesisUtterance(aiText.slice(0, 300))
+          u.rate = 0.95
+          const voices = window.speechSynthesis.getVoices()
+          const v = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) || voices.find(v => v.lang.startsWith('en'))
+          if (v) u.voice = v
+          window.speechSynthesis.speak(u)
+        }
+      } catch {}
+    } catch (err) {
+      setMessages(prev => [...prev.filter(m => m.text !== '🎸 [played guitar — analyzing...]'), { role: 'ai', text: `⚠️ ${err.message}` }])
+    } finally {
+      setLoadingSync(false)
+    }
+  }
+
+  // Voice question recording — tap to start, tap again to stop & send
   const toggleRecording = async () => {
     if (recording) {
       // Stop recording
@@ -362,6 +449,19 @@ export default function LessonPage() {
 
         {/* Controls */}
         <div className="p-4 border-t border-white/10 space-y-3">
+          {/* Guitar audio analysis button */}
+          <button
+            onClick={toggleGuitarRecord}
+            disabled={loading || recording}
+            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              guitarRecording
+                ? 'bg-red-500 ring-4 ring-red-300 text-white'
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            } disabled:opacity-50`}
+          >
+            {guitarRecording ? '⏹ Tap to stop & analyze' : '🎸 Record my playing'}
+          </button>
+
           {/* Mic + camera toggle row */}
           <div className="flex items-center gap-3">
             <button
