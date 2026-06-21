@@ -146,14 +146,23 @@ export default function LessonPage() {
     }
   }
 
-  // Voice recording — uses timeslice for reliable Android capture
-  const startRecording = async () => {
+  // Voice recording — tap to start, tap again to stop & send
+  const toggleRecording = async () => {
+    if (recording) {
+      // Stop recording
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+      setRecording(false)
+      return
+    }
+
     if (loadingRef.current) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       audioChunksRef.current = []
 
-      // Pick best supported format
+      // Pick best supported MIME type
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
@@ -167,26 +176,19 @@ export default function LessonPage() {
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
         if (audioChunksRef.current.length === 0) {
-          setError('No audio captured — try holding longer')
+          setError('No audio captured — speak then tap mic again to send')
           return
         }
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
         await transcribeAndSend(blob, mimeType)
       }
-      mr.start(250) // timeslice: fire ondataavailable every 250ms for reliability
+      mr.start(250)
       mediaRecorderRef.current = mr
       setRecording(true)
       setError('')
     } catch (err) {
-      setError(`Mic error: ${err.message}`)
+      setError(`Mic error: ${err.message} — try the text box instead`)
     }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop()
-    }
-    setRecording(false)
   }
 
   const transcribeAndSend = async (audioBlob, mimeType) => {
@@ -363,24 +365,21 @@ export default function LessonPage() {
           {/* Mic + camera toggle row */}
           <div className="flex items-center gap-3">
             <button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={(e) => { e.preventDefault(); startRecording() }}
-              onTouchEnd={(e) => { e.preventDefault(); stopRecording() }}
+              onClick={toggleRecording}
               disabled={loading}
               className={`flex-shrink-0 w-14 h-14 rounded-full font-bold text-2xl transition-all ${
                 recording
-                  ? 'bg-red-500 scale-110'
-                  : 'bg-orange-500 hover:bg-orange-600 hover:scale-105'
+                  ? 'bg-red-500 scale-110 ring-4 ring-red-300'
+                  : 'bg-orange-500 hover:bg-orange-600 active:scale-95'
               } text-white disabled:opacity-50`}
-              title="Hold to speak"
+              title={recording ? 'Tap to stop & send' : 'Tap to speak'}
             >
-              🎤
+              {recording ? '⏹️' : '🎤'}
             </button>
 
             <div className="flex-1 text-center">
               <p className="text-xs text-gray-400">
-                {recording ? '🔴 Recording — release to send' : 'Hold mic to speak'}
+                {recording ? '🔴 Recording… tap ⏹️ to send' : 'Tap 🎤 to speak'}
               </p>
             </div>
 
