@@ -97,28 +97,23 @@ export default function LessonPage() {
       setMessages(prev => [...prev, { role: 'ai', text: aiText }])
       if (data.topic) setCurrentTopic(data.topic)
 
-      // TTS — wrapped in try/catch, autoplay may be blocked on mobile
+      // TTS — use browser SpeechSynthesis (free, works on all mobile browsers)
       try {
-        const ttsRes = await fetch(`${API_BASE}/api/tts`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ text: aiText.slice(0, 300) }),
-        })
-        if (ttsRes.ok) {
-          const blob = await ttsRes.blob()
-          const url = URL.createObjectURL(blob)
-          if (audioRef.current) {
-            audioRef.current.pause()
-            URL.revokeObjectURL(audioRef.current.src)
-          }
-          audioRef.current = new Audio(url)
-          await audioRef.current.play()
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          window.speechSynthesis.cancel() // stop any previous speech
+          const utterance = new SpeechSynthesisUtterance(aiText.slice(0, 300))
+          utterance.rate = 0.95
+          utterance.pitch = 1.0
+          utterance.volume = 1.0
+          // Pick a natural voice if available
+          const voices = window.speechSynthesis.getVoices()
+          const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
+            || voices.find(v => v.lang.startsWith('en'))
+          if (preferred) utterance.voice = preferred
+          window.speechSynthesis.speak(utterance)
         }
       } catch {
-        // TTS failure is non-fatal — text response still shown
+        // TTS failure is non-fatal
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: `⚠️ Error: ${err.message}` }])
