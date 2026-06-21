@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-dark: #0d0d1a;
+  --bg-darker: #080812;
+  --accent: #f97316;
+  --gold: #f59e0b;
+  --purple: #7c3aed;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #0d0d1a;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+::-webkit-scrollbar-thumb {
+  background: #f97316;
+  border-radius: 3px;
+}
+
+/* Guitar string animation */
+@keyframes strum {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
+}
+
+.strum {
+  animation: strum 0.2s ease-in-out;
+}
+
+/* Metronome pendulum */
+@keyframes swing {
+  0% { transform: rotate(-30deg); }
+  100% { transform: rotate(30deg); }
+}
+
+/* Pulse for recording */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-rec {
+  animation: pulse-red 1s ease-in-out infinite;
+}
+
+/* Glow effect */
+.glow-orange {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+}
+
+/* Tab notation styling */
+.tab-notation {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre;
+  letter-spacing: 0.05em;
+}
+
+/* Gradient backgrounds */
+.bg-guitar-hero {
+  background: linear-gradient(135deg, #0d0d1a 0%, #1a0a2e 50%, #0d1a1a 100%);
+}
+
+.bg-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

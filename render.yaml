@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: fret-buddy-web
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://fret-buddy-api.onrender.com
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://yruuzkxpnbgruwuivchy.supabase.co
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        value: pk_live_51TTpplHfCuVeN1IrcHjby0slnE9vTvmL0cs3muq2qo2y1AMtf94rVMuEXm73AuJblrhCQ8XqbmQ7qj6n7yY2HUje00HGciov2V
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
