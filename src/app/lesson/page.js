@@ -63,7 +63,7 @@ export default function LessonPage() {
     try {
       const token = getToken()
       const body = { message: text || 'Analyze my guitar technique from the image' }
-      if (imageData) body.image = imageData
+      if (imageData) body.image_base64 = imageData
 
       const res = await fetch(`${API_BASE}/api/teach`, {
         method: 'POST',
