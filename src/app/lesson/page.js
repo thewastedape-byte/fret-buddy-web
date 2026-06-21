@@ -19,6 +19,7 @@ export default function LessonPage() {
   const cameraActiveRef = useRef(false)
 
   const [cameraActive, setCameraActive] = useState(false)
+  const [facingMode, setFacingMode] = useState('environment')
   const [recording, setRecording] = useState(false)
   const [lessonMode, setLessonMode] = useState(false)
   const [messages, setMessages] = useState([
@@ -77,7 +78,7 @@ export default function LessonPage() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: { facingMode: { ideal: facingMode } },
         audio: false
       })
       streamRef.current = stream
