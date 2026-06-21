@@ -100,15 +100,21 @@ export default function LessonPage() {
       setMessages(prev => [...prev, { role: 'ai', text: aiText }])
       if (data.topic) setCurrentTopic(data.topic)
 
-      // TTS — use browser SpeechSynthesis (free, works on all mobile browsers)
+      // TTS — strip markdown then speak
       try {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
-          window.speechSynthesis.cancel() // stop any previous speech
-          const utterance = new SpeechSynthesisUtterance(aiText.slice(0, 300))
-          utterance.rate = 0.95
+          window.speechSynthesis.cancel()
+          const spoken = aiText
+            .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
+            .replace(/\*(.+?)\*/g, '$1')       // *italic* → italic
+            .replace(/#{1,6}\s/g, '')           // ## headers
+            .replace(/\[(.+?)\]\(.+?\)/g, '$1') // [link](url) → link
+            .replace(/`(.+?)`/g, '$1')          // `code`
+            .slice(0, 500)
+          const utterance = new SpeechSynthesisUtterance(spoken)
+          utterance.rate = 0.92
           utterance.pitch = 1.0
           utterance.volume = 1.0
-          // Pick a natural voice if available
           const voices = window.speechSynthesis.getVoices()
           const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
             || voices.find(v => v.lang.startsWith('en'))
@@ -116,7 +122,7 @@ export default function LessonPage() {
           window.speechSynthesis.speak(utterance)
         }
       } catch {
-        // TTS failure is non-fatal
+        // non-fatal
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: `⚠️ Error: ${err.message}` }])
@@ -218,8 +224,14 @@ export default function LessonPage() {
       try {
         if (window.speechSynthesis) {
           window.speechSynthesis.cancel()
-          const u = new SpeechSynthesisUtterance(aiText.slice(0, 300))
-          u.rate = 0.95
+          const spoken = aiText
+            .replace(/\*\*(.+?)\*\*/g, '$1')
+            .replace(/\*(.+?)\*/g, '$1')
+            .replace(/#{1,6}\s/g, '')
+            .replace(/`(.+?)`/g, '$1')
+            .slice(0, 500)
+          const u = new SpeechSynthesisUtterance(spoken)
+          u.rate = 0.92
           const voices = window.speechSynthesis.getVoices()
           const v = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) || voices.find(v => v.lang.startsWith('en'))
           if (v) u.voice = v
