@@ -8,6 +8,7 @@ export default function LessonPage() {
   const videoRef = useRef(null)
   const pipRef = useRef(null)
   const canvasRef = useRef(null)
+  const streamRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const autoCapureIntervalRef = useRef(null)
@@ -79,14 +80,10 @@ export default function LessonPage() {
         video: { facingMode: { ideal: 'environment' } },
         audio: false
       })
+      streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
-      }
-      // Mirror stream to PiP preview in chat panel
-      if (pipRef.current) {
-        pipRef.current.srcObject = stream
-        pipRef.current.play()
       }
       setCameraActive(true)
       cameraActiveRef.current = true
@@ -352,6 +349,14 @@ export default function LessonPage() {
       if (autoCapureIntervalRef.current) clearInterval(autoCapureIntervalRef.current)
     }
   }, [])
+
+  // Wire PiP after cameraActive renders the pip video element into DOM
+  useEffect(() => {
+    if (cameraActive && pipRef.current && streamRef.current) {
+      pipRef.current.srcObject = streamRef.current
+      pipRef.current.play().catch(() => {})
+    }
+  }, [cameraActive])
 
   const messagesEndRef = useRef(null)
   useEffect(() => {
