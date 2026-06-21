@@ -32,6 +32,40 @@ export default function LessonPage() {
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('fretbuddy_token') : null
 
+  // Android Chrome TTS cutoff fix — split into sentence chunks and queue
+  const speakChunked = (text) => {
+    if (!window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+    const clean = text
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    // Split at sentence boundaries, max 180 chars per chunk
+    const raw = clean.match(/[^.!?\n]+[.!?\n]*/g) || [clean]
+    const chunks = []
+    let cur = ''
+    for (const s of raw) {
+      if ((cur + s).length > 180) { if (cur) chunks.push(cur.trim()); cur = s }
+      else cur += s
+    }
+    if (cur.trim()) chunks.push(cur.trim())
+    const voices = window.speechSynthesis.getVoices()
+    const voice = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
+      || voices.find(v => v.lang.startsWith('en'))
+    let i = 0
+    const next = () => {
+      if (i >= chunks.length) return
+      const u = new SpeechSynthesisUtterance(chunks[i++])
+      u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0
+      if (voice) u.voice = voice
+      u.onend = next
+      window.speechSynthesis.speak(u)
+    }
+    next()
+  }
+
   // Keep loadingRef in sync with state
   const setLoadingSync = (val) => {
     loadingRef.current = val
@@ -69,12 +103,20 @@ export default function LessonPage() {
   const captureFrame = () => {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas || !video.videoWidth) return null
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0)
-    return canvas.toDataURL('image/jpeg', 0.6)
+    if (!video || !canvas) return null
+    // Use actual dimensions or fallback — don't block on videoWidth=0 (Android bug)
+    canvas.width = video.videoWidth || video.clientWidth || 640
+    canvas.height = video.videoHeight || video.clientHeight || 480
+    try {
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+      // Verify it's not a blank frame (blank = very short data URL)
+      if (dataUrl.length < 1000) return null
+      return dataUrl
+    } catch {
+      return null
+    }
   }
 
   const sendToAI = async (text, imageData) => {
@@ -100,26 +142,10 @@ export default function LessonPage() {
       setMessages(prev => [...prev, { role: 'ai', text: aiText }])
       if (data.topic) setCurrentTopic(data.topic)
 
-      // TTS — strip markdown then speak
+      // TTS — chunk into sentences to fix Android Chrome cutoff bug
       try {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
-          window.speechSynthesis.cancel()
-          const spoken = aiText
-            .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
-            .replace(/\*(.+?)\*/g, '$1')       // *italic* → italic
-            .replace(/#{1,6}\s/g, '')           // ## headers
-            .replace(/\[(.+?)\]\(.+?\)/g, '$1') // [link](url) → link
-            .replace(/`(.+?)`/g, '$1')          // `code`
-            .slice(0, 500)
-          const utterance = new SpeechSynthesisUtterance(spoken)
-          utterance.rate = 0.92
-          utterance.pitch = 1.0
-          utterance.volume = 1.0
-          const voices = window.speechSynthesis.getVoices()
-          const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
-            || voices.find(v => v.lang.startsWith('en'))
-          if (preferred) utterance.voice = preferred
-          window.speechSynthesis.speak(utterance)
+          speakChunked(aiText)
         }
       } catch {
         // non-fatal
@@ -221,23 +247,7 @@ export default function LessonPage() {
         { role: 'ai', text: aiText },
       ])
       // Speak the response
-      try {
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel()
-          const spoken = aiText
-            .replace(/\*\*(.+?)\*\*/g, '$1')
-            .replace(/\*(.+?)\*/g, '$1')
-            .replace(/#{1,6}\s/g, '')
-            .replace(/`(.+?)`/g, '$1')
-            .slice(0, 500)
-          const u = new SpeechSynthesisUtterance(spoken)
-          u.rate = 0.92
-          const voices = window.speechSynthesis.getVoices()
-          const v = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) || voices.find(v => v.lang.startsWith('en'))
-          if (v) u.voice = v
-          window.speechSynthesis.speak(u)
-        }
-      } catch {}
+      try { if (typeof window !== 'undefined' && window.speechSynthesis) speakChunked(aiText) } catch {}
     } catch (err) {
       setMessages(prev => [...prev.filter(m => m.text !== '🎸 [played guitar — analyzing...]'), { role: 'ai', text: `⚠️ ${err.message}` }])
     } finally {
