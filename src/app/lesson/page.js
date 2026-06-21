@@ -97,24 +97,28 @@ export default function LessonPage() {
   const flipCamera = async () => {
     const newMode = facingMode === 'environment' ? 'user' : 'environment'
     setFacingMode(newMode)
-    if (cameraActiveRef.current) {
-      // Stop current stream
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(t => t.stop())
-        videoRef.current.srcObject = null
+    if (!cameraActiveRef.current) return
+    try {
+      // Stop ALL tracks from the stored stream ref
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
       }
-      // Restart with new facing mode
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: newMode } },
-          audio: false
-        })
-        streamRef.current = stream
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
-        if (pipRef.current) { pipRef.current.srcObject = stream; pipRef.current.play().catch(() => {}) }
-      } catch (err) {
-        setError(`Camera flip failed: ${err.message}`)
-      }
+      // Null out both video elements
+      if (videoRef.current) videoRef.current.srcObject = null
+      if (pipRef.current) pipRef.current.srcObject = null
+      // Brief pause so Android releases the camera hardware
+      await new Promise(r => setTimeout(r, 300))
+      // Start new stream with flipped camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: newMode } },
+        audio: false
+      })
+      streamRef.current = stream
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
+      if (pipRef.current) { pipRef.current.srcObject = stream; pipRef.current.play().catch(() => {}) }
+    } catch (err) {
+      setError(`Flip failed: ${err.message}`)
     }
   }
 
