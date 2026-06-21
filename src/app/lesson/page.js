@@ -17,6 +17,7 @@ export default function LessonPage() {
   // Refs to avoid stale closures in intervals
   const loadingRef = useRef(false)
   const cameraActiveRef = useRef(false)
+  const speakingRef = useRef(false)
 
   const [cameraActive, setCameraActive] = useState(false)
   const [facingMode, setFacingMode] = useState('environment')
@@ -36,8 +37,8 @@ export default function LessonPage() {
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('fretbuddy_token') : null
 
   // Android Chrome TTS cutoff fix — split into sentence chunks and queue
-  const speakChunked = (text) => {
-    if (!window.speechSynthesis) return
+  const speakChunked = (text, onDone) => {
+    if (!window.speechSynthesis) { onDone?.(); return }
     window.speechSynthesis.cancel()
     const clean = text
       .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -59,11 +60,12 @@ export default function LessonPage() {
       || voices.find(v => v.lang.startsWith('en'))
     let i = 0
     const next = () => {
-      if (i >= chunks.length) return
+      if (i >= chunks.length) { onDone?.(); return }
       const u = new SpeechSynthesisUtterance(chunks[i++])
       u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0
       if (voice) u.voice = voice
       u.onend = next
+      u.onerror = () => { onDone?.() }
       window.speechSynthesis.speak(u)
     }
     next()
@@ -177,10 +179,11 @@ export default function LessonPage() {
       // TTS — chunk into sentences to fix Android Chrome cutoff bug
       try {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
-          speakChunked(aiText)
+          speakingRef.current = true
+          speakChunked(aiText, () => { speakingRef.current = false })
         }
       } catch {
-        // non-fatal
+        speakingRef.current = false
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: `⚠️ Error: ${err.message}` }])
@@ -198,11 +201,12 @@ export default function LessonPage() {
     setError('')
     setMessages(prev => [...prev, { role: 'system', text: '📸 Lesson Mode ON — analyzing every 10 seconds' }])
     autoCapureIntervalRef.current = setInterval(() => {
-      if (loadingRef.current) return // uses ref, not stale state
+      if (loadingRef.current) return
+      if (speakingRef.current) return // wait for Buddy to finish speaking
       if (!cameraActiveRef.current) return
       const frame = captureFrame()
-      if (frame) sendToAI('Analyze my guitar technique in detail', frame)
-    }, 10000)
+      if (frame) sendToAI('Look closely at my fretting hand finger placement, thumb position, wrist angle, and which chord or notes I am forming. Be specific about what you see and give me one concrete correction or tip.', frame)
+    }, 25000)
   }
 
   const stopLessonMode = () => {
@@ -279,7 +283,12 @@ export default function LessonPage() {
         { role: 'ai', text: aiText },
       ])
       // Speak the response
-      try { if (typeof window !== 'undefined' && window.speechSynthesis) speakChunked(aiText) } catch {}
+      try {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          speakingRef.current = true
+          speakChunked(aiText, () => { speakingRef.current = false })
+        }
+      } catch { speakingRef.current = false }
     } catch (err) {
       setMessages(prev => [...prev.filter(m => m.text !== '🎸 [played guitar — analyzing...]'), { role: 'ai', text: `⚠️ ${err.message}` }])
     } finally {
