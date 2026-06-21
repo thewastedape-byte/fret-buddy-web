@@ -113,12 +113,18 @@ export default function LessonPage() {
   }, [currentTopic])
 
   const startLessonMode = () => {
+    if (!cameraActive) {
+      setError('Enable camera first before starting Lesson Mode.')
+      return
+    }
     setLessonMode(true)
-    setMessages(prev => [...prev, { role: 'system', text: '📸 Lesson Mode ON — capturing your technique every 5 seconds' }])
+    setError('')
+    setMessages(prev => [...prev, { role: 'system', text: '📸 Lesson Mode ON — capturing your technique every 10 seconds' }])
     autoCapureIntervalRef.current = setInterval(() => {
+      if (loading) return // skip if still waiting on previous response
       const frame = captureFrame()
       if (frame) sendToAI('Analyze my guitar technique', frame)
-    }, 5000)
+    }, 10000)
   }
 
   const stopLessonMode = () => {
